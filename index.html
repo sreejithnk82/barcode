@@ -199,8 +199,9 @@
                 <div style="flex:2">
                     <label>Paper Size</label>
                     <select id="paperSize" onchange="updateDefaults()">
-                        <option value="a4" selected>A4</option>
+                        <option value="a4">A4</option>
                         <option value="a3">A3</option>
+                        <option value="a3_express" selected>A3 Express</option>
                     </select>
                 </div>
                 <div style="flex:1; display:flex; align-items:flex-end;">
@@ -214,11 +215,11 @@
                     <div class="form-row form-group">
                         <div>
                             <label>Card Width (mm)</label>
-                            <input type="number" id="cardWidth" value="35.6" min="10" step="0.1">
+                            <input type="number" id="cardWidth" value="41.7" min="10" step="0.1">
                         </div>
                         <div>
                             <label>Card Height (mm)</label>
-                            <input type="number" id="cardHeight" value="20" min="10" step="0.1">
+                            <input type="number" id="cardHeight" value="22.5" min="10" step="0.1">
                         </div>
                     </div>
 
@@ -268,11 +269,20 @@
             document.getElementById("bulkInputSection").style.display = mode === "bulk" ? "block" : "none";
         }
         function updateDefaults() {
-            document.getElementById("cardWidth").value = "35.6";
-            document.getElementById("cardHeight").value = "20";
-            document.getElementById("colGap").value = "3";
-            document.getElementById("rowGap").value = "3";
-            document.getElementById("borderRadius").value = "3";
+            const paperSize = document.getElementById("paperSize").value;
+            if (paperSize === "a3_express") {
+                document.getElementById("cardWidth").value = "41.7";
+                document.getElementById("cardHeight").value = "22.5";
+                document.getElementById("colGap").value = "3";
+                document.getElementById("rowGap").value = "3";
+                document.getElementById("borderRadius").value = "3";
+            } else {
+                document.getElementById("cardWidth").value = "35.6";
+                document.getElementById("cardHeight").value = "20";
+                document.getElementById("colGap").value = "3";
+                document.getElementById("rowGap").value = "3";
+                document.getElementById("borderRadius").value = "3";
+            }
         }
         
         let generatedCodes = [];
@@ -352,11 +362,21 @@
         function generatePDFDocument() {
             const { jsPDF } = window.jspdf;
             const paperSize = document.getElementById("paperSize").value;
-            const pdf = new jsPDF("p", "mm", paperSize);
+            const pdfSize = paperSize === "a3_express" ? [329, 483] : paperSize;
+            const pdf = new jsPDF("p", "mm", pdfSize);
 
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            const margin = 10;
+            
+            let marginTop = 10, marginBottom = 10, marginLeft = 10, marginRight = 10;
+            if (paperSize === "a3_express") {
+                marginTop = 25.4; // 1 inch
+                marginBottom = 12.7; // 0.5 inch
+                marginLeft = 12.7;
+                marginRight = 12.7;
+            } else {
+                marginTop = marginBottom = marginLeft = marginRight = 10;
+            }
 
             const cardW = parseFloat(document.getElementById("cardWidth").value) || 40;
             const cardH = parseFloat(document.getElementById("cardHeight").value) || 25;
@@ -366,12 +386,15 @@
             const rowGap = parseFloat(document.getElementById("rowGap").value) || 0;
             const colGap = parseFloat(document.getElementById("colGap").value) || 0;
 
-            const isRotated = (paperSize === "a3");
+            const isRotated = (paperSize === "a3" || paperSize === "a3_express");
             const effectiveW = isRotated ? cardH : cardW;
             const effectiveH = isRotated ? cardW : cardH;
 
-            const maxCols = Math.max(1, Math.floor((pageWidth - 2 * margin + colGap) / (effectiveW + colGap)));
-            const maxRows = Math.max(1, Math.floor((pageHeight - 2 * margin + rowGap) / (effectiveH + rowGap)));
+            const availableW = pageWidth - marginLeft - marginRight;
+            const availableH = pageHeight - marginTop - marginBottom;
+
+            const maxCols = Math.max(1, Math.floor((availableW + colGap) / (effectiveW + colGap)));
+            const maxRows = Math.max(1, Math.floor((availableH + rowGap) / (effectiveH + rowGap)));
             const cardsPerPage = maxCols * maxRows;
 
             for (let i = 0; i < generatedCodes.length; i++) {
@@ -385,8 +408,8 @@
                 const row = Math.floor(iOnPage / maxCols);
                 const col = iOnPage % maxCols;
 
-                const x = margin + col * (effectiveW + colGap);
-                const y = margin + row * (effectiveH + rowGap);
+                const x = marginLeft + col * (effectiveW + colGap);
+                const y = marginTop + row * (effectiveH + rowGap);
 
                 if (drawBorder) {
                     if (radius > 0) {
@@ -397,18 +420,35 @@
                 }
 
                 // Create temporary canvas for barcode
-                const canvas = document.createElement("canvas");
-                JsBarcode(canvas, code, {
+                const bcCanvas = document.createElement("canvas");
+                JsBarcode(bcCanvas, code, {
                     format: "CODE128",
                     lineColor: "#000",
-                    background: "#ffffff",
                     width: 2,
-                    height: 50,
+                    height: 35,
                     margin: 0,
                     font: "'Courier New', Consolas, monospace",
                     fontOptions: "bold",
-                    displayValue: true
+                    displayValue: true,
+                    fontSize: 34
                 });
+
+                const canvas = document.createElement("canvas");
+                const textSpace = 32;
+                canvas.width = Math.max(bcCanvas.width, 100);
+                canvas.height = bcCanvas.height + textSpace;
+                const ctxCanvas = canvas.getContext("2d");
+                
+                ctxCanvas.fillStyle = "#ffffff";
+                ctxCanvas.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctxCanvas.fillStyle = "#000000";
+                ctxCanvas.font = "bold 28px Arial, sans-serif";
+                ctxCanvas.textAlign = "center";
+                ctxCanvas.textBaseline = "top";
+                ctxCanvas.fillText("DTDC", canvas.width / 2, 2);
+                
+                ctxCanvas.drawImage(bcCanvas, (canvas.width - bcCanvas.width) / 2, textSpace);
 
                 let finalCanvas = canvas;
                 if (isRotated) {
@@ -416,15 +456,12 @@
                     finalCanvas.width = canvas.height;
                     finalCanvas.height = canvas.width;
                     const ctx = finalCanvas.getContext("2d");
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
                     ctx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
                     ctx.rotate(-Math.PI / 2);
                     ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
                 }
 
-                // Compress using JPEG to significantly reduce the size of the generated PDF
-                const imgData = finalCanvas.toDataURL("image/jpeg", 0.85);
+                const imgData = finalCanvas.toDataURL("image/png");
                 
                 const canvasW = finalCanvas.width;
                 const canvasH = finalCanvas.height;
@@ -443,7 +480,7 @@
                 let targetX = x + (effectiveW - bcW) / 2;
                 let targetY = y + (effectiveH - bcH) / 2;
 
-                pdf.addImage(imgData, "JPEG", targetX, targetY, bcW, bcH, undefined, "FAST");
+                pdf.addImage(imgData, "PNG", targetX, targetY, bcW, bcH);
             }
 
             return pdf;
