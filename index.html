@@ -461,7 +461,8 @@
                     ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
                 }
 
-                const imgData = finalCanvas.toDataURL("image/png");
+                //const imgData = finalCanvas.toDataURL("image/png");
+                const imgData = finalCanvas.toDataURL("image/jpeg", 0.85);
                 
                 const canvasW = finalCanvas.width;
                 const canvasH = finalCanvas.height;
@@ -480,7 +481,8 @@
                 let targetX = x + (effectiveW - bcW) / 2;
                 let targetY = y + (effectiveH - bcH) / 2;
 
-                pdf.addImage(imgData, "PNG", targetX, targetY, bcW, bcH);
+                //pdf.addImage(imgData, "PNG", targetX, targetY, bcW, bcH);
+                pdf.addImage(imgData, "JPEG", targetX, targetY, bcW, bcH, undefined, "FAST");
             }
 
             return pdf;
