@@ -237,13 +237,22 @@
                     <div class="form-row form-group">
                         <div style="flex: 2; display: flex; align-items: center;">
                             <label style="margin: 0; display:flex; align-items:center; cursor:pointer;">
-                                <input type="checkbox" id="drawBorder" checked style="margin-right: 8px; width:16px; height:16px;"> 
+                                <input type="checkbox" id="drawBorder" style="margin-right: 8px; width:16px; height:16px;"> 
                                 Draw Border
                             </label>
                         </div>
                         <div style="flex: 1;">
                             <label>Radius (mm)</label>
                             <input type="number" id="borderRadius" value="3" min="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row form-group" id="cropMarksRow">
+                        <div style="display: flex; align-items: center;">
+                            <label style="margin: 0; display:flex; align-items:center; cursor:pointer;">
+                                <input type="checkbox" id="drawCropMarksInput" checked style="margin-right: 8px; width:16px; height:16px;"> 
+                                Draw Crop Marks
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -270,6 +279,10 @@
         }
         function updateDefaults() {
             const paperSize = document.getElementById("paperSize").value;
+            const cropRow = document.getElementById("cropMarksRow");
+            if (cropRow) {
+                cropRow.style.display = paperSize === "a3_express" ? "flex" : "none";
+            }
             if (paperSize === "a3_express") {
                 document.getElementById("cardWidth").value = "41.7";
                 document.getElementById("cardHeight").value = "22.5";
@@ -397,11 +410,51 @@
             const maxRows = Math.max(1, Math.floor((availableH + rowGap) / (effectiveH + rowGap)));
             const cardsPerPage = maxCols * maxRows;
 
+            const drawCropMarks = () => {
+                const drawCropMarksCheckbox = document.getElementById("drawCropMarksInput");
+                if (paperSize === "a3_express" && drawCropMarksCheckbox && drawCropMarksCheckbox.checked) {
+                    const x0 = marginLeft;
+                    const y0 = marginTop;
+                    // Note: calculate the actual boundaries of the grid based on the max possible cards per page
+                    const x1 = marginLeft + maxCols * effectiveW + (maxCols - 1) * colGap;
+                    const y1 = marginTop + maxRows * effectiveH + (maxRows - 1) * rowGap;
+
+                    pdf.setDrawColor(0);
+                    pdf.setLineWidth(0.5);
+
+                    // Calculate diagonal starting point for a 4mm margin on both axes
+                    // The diagonal distance is mathematically sqrt(4^2 + 4^2) = 5.656mm
+                    const m = 4; 
+                    const len = 14;
+
+                    // Top-Left corner markings (Inward framing, 90 deg angle)
+                    pdf.line(x0 - m, y0 - m, x0 - m + len, y0 - m); // Horizontal inwards
+                    pdf.line(x0 - m, y0 - m, x0 - m, y0 - m + len); // Vertical inwards
+                    // Extra 3mm line after a 3mm gap to identify Top-Left corner
+                    pdf.line(x0 - m + len + 3, y0 - m, x0 - m + len + 6, y0 - m);
+
+                    // Top-Right corner markings (Inward framing, 90 deg angle)
+                    pdf.line(x1 + m, y0 - m, x1 + m - len, y0 - m);
+                    pdf.line(x1 + m, y0 - m, x1 + m, y0 - m + len);
+
+                    // Bottom-Left corner markings (Inward framing, 90 deg angle)
+                    pdf.line(x0 - m, y1 + m, x0 - m + len, y1 + m);
+                    pdf.line(x0 - m, y1 + m, x0 - m, y1 + m - len);
+
+                    // Bottom-Right corner markings (Inward framing, 90 deg angle)
+                    pdf.line(x1 + m, y1 + m, x1 + m - len, y1 + m);
+                    pdf.line(x1 + m, y1 + m, x1 + m, y1 + m - len);
+                }
+            };
+
             for (let i = 0; i < generatedCodes.length; i++) {
                 const code = generatedCodes[i];
 
-                if (i > 0 && i % cardsPerPage === 0) {
+                if (i === 0) {
+                    drawCropMarks();
+                } else if (i % cardsPerPage === 0) {
                     pdf.addPage();
+                    drawCropMarks();
                 }
 
                 const iOnPage = i % cardsPerPage;
