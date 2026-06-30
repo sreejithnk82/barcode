@@ -202,6 +202,7 @@
                         <option value="a4">A4</option>
                         <option value="a3">A3</option>
                         <option value="a3_express" selected>A3 Express</option>
+                        <option value="label_100x75">100 × 75 mm</option>
                     </select>
                 </div>
                 <div style="flex:1; display:flex; align-items:flex-end;">
@@ -286,6 +287,12 @@
             if (paperSize === "a3_express") {
                 document.getElementById("cardWidth").value = "41.7";
                 document.getElementById("cardHeight").value = "22.5";
+                document.getElementById("colGap").value = "3";
+                document.getElementById("rowGap").value = "3";
+                document.getElementById("borderRadius").value = "3";
+            } else if (paperSize === "label_100x75") {
+                document.getElementById("cardWidth").value = "46";
+                document.getElementById("cardHeight").value = "21";
                 document.getElementById("colGap").value = "3";
                 document.getElementById("rowGap").value = "3";
                 document.getElementById("borderRadius").value = "3";
@@ -375,8 +382,9 @@
         function generatePDFDocument() {
             const { jsPDF } = window.jspdf;
             const paperSize = document.getElementById("paperSize").value;
-            const pdfSize = paperSize === "a3_express" ? [329, 483] : paperSize;
-            const pdf = new jsPDF("p", "mm", pdfSize);
+            const pdfSize = paperSize === "a3_express" ? [329, 483] : (paperSize === "label_100x75" ? [100, 75] : paperSize);
+            const pdfOrientation = paperSize === "label_100x75" ? "l" : "p";
+            const pdf = new jsPDF(pdfOrientation, "mm", pdfSize);
 
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
@@ -387,6 +395,8 @@
                 marginBottom = 12.7; // 0.5 inch
                 marginLeft = 12.7;
                 marginRight = 12.7;
+            } else if (paperSize === "label_100x75") {
+                marginTop = marginBottom = marginLeft = marginRight = 2; // thermal label margin
             } else {
                 marginTop = marginBottom = marginLeft = marginRight = 10;
             }
